@@ -203,8 +203,8 @@ and ppSeq indent style list =
 			outc ']'
 
 let ppDoc oc doc =
-	(* "@[<h>%%YAML@ 1.2@]@ " for YAML 1.2 compliance *)
 	Buffer.clear b;
+	outs "%YAML 1.2\n---\n";
 	ppNode 0 doc.node;
 	Buffer.output_buffer oc b;
 	flush oc
