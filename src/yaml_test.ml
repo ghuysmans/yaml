@@ -15,7 +15,12 @@
 open Yaml
 
 let _ =
-	let node1 = mkSeqFlow [mkBool false; mkInt 1; mkInt 2] in
+	let node1 =
+		mkSeqFlow
+			[mkBool false; mkInt 1;
+			mkMapFlow [ (mkStr "p1", mkStr "p2"); (mkStr "p3", mkStr "p4") ];
+			mkInt 2 ]
+	in
 	let node2 = mkStr "toto" in
 	
 	let node4 = mkStr "tata" in
@@ -31,7 +36,6 @@ let _ =
 	let node = mkSeqBlock [node1; node2; node3] in
 	let doc = mkDoc node in
 	
-	let oc = open_out "file.txt" in
-	let f = Format.make_formatter (output oc) (fun () -> flush oc) in
-	ppDoc f doc;
+	let oc = open_out "yaml_test.txt" in
+	ppDoc oc doc;
 	close_out oc

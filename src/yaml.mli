@@ -1,6 +1,6 @@
 (*****************************************************************************)
-(* Yaml                                                                     *)
-(* Copyright (c) 2007-2008, IETR/INSA of Rennes.                             *)
+(* Yaml                                                                      *)
+(* Copyright (c) 2009, IETR/INSA of Rennes.                                  *)
 (* All rights reserved.                                                      *)
 (*                                                                           *)
 (* This software is governed by the CeCILL-B license under French law and    *)
@@ -79,4 +79,4 @@ val isScalar : node -> bool
 
 val isSeq : node -> bool
 
-val ppDoc : Format.formatter -> doc -> unit
+val ppDoc : out_channel -> doc -> unit

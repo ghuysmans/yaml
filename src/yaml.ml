@@ -110,32 +110,48 @@ let isSeq node =
 		| Seq _ -> true
 		| _ -> false
 
-let ppScalar f = function
-	| Binary b -> Format.fprintf f "%s" b
-	| Bool b -> Format.fprintf f "%b" b
-	| Float fl -> Format.fprintf f "%f" fl
-	| Int i -> Format.fprintf f "%i" i
-	| Null -> Format.fprintf f "null"
-	| Str s -> Format.fprintf f "\"%s\"" s
+(* the buffer will be used by every output. *)
+let b = Buffer.create 16384
+let outc c = Buffer.add_char b c
+let outs s = Buffer.add_string b s
+let num_sp = 2
 
-let pp = Format.fprintf
+let ppScalar = function
+	| Binary bin -> outc '"'; outs bin; outc '"'
+	| Bool bool -> outs (string_of_bool bool)
+	| Float f -> outs (string_of_float f)
+	| Int i -> outs (string_of_int i)
+	| Null -> outs "null"
+	| Str s -> outc '"'; outs s; outc '"'
 
-let rec pp_newlines fn f list =
+let ppIndent indent = for i = 1 to indent do outc ' ' done
+
+let rec ppNewlines indent fn list =
 	match list with
 		| [] -> ()
 		| [last] -> fn last
 		| head :: rest ->
 			fn head;
-			pp f "@ ";
-			pp_newlines fn f rest
+			outs "\n";
+			ppIndent indent;
+			ppNewlines indent fn rest
 
-let rec ppNode f node =
+let rec ppCommas fn map =
+	match map with
+		| [] -> ()
+		| [last] -> fn last
+		| head :: rest ->
+			fn head;
+			outs ", ";
+			ppCommas fn rest
+
+let rec ppNode indent node =
 	match node.kind with
-		| Scalar scalar -> ppScalar f scalar
-		| Seq (style, list) -> ppSeq f style list
-		| Map (style, map) -> ppMap f style map
+		| Scalar scalar -> ppScalar scalar
+		| Seq (style, list) -> ppSeq indent style list
+		| Map (style, map) -> ppMap indent style map
 
-and ppMap f style map =
+and ppMap indent style map =
 	let style =
 		match style with
 		| None -> Block
@@ -143,27 +159,29 @@ and ppMap f style map =
 	in
 	match style with
 		| Block ->
-			pp f "@[<v>";
-			pp_newlines
+			let newIndent = indent + num_sp in
+			ppNewlines indent
 				(fun (key, value) ->
+					ppNode newIndent key;
 					if isScalar value then
-						pp f "@[<hov>%a : %a@]" ppNode key ppNode value
-					else
-						pp f "@[<v2>@[<hov>%a : @]@ @[<hov>%a@]@]" ppNode key ppNode value)
-			f map;
-			pp f "@]"
+						outs " : "
+					else (
+						outs " :\n";
+						ppIndent newIndent
+					);
+					ppNode newIndent value)
+			map
 		| Flow ->
-			pp f "@[<hov>{";
-			List.iter
+			outc '{';
+			ppCommas
 				(fun (key, value) ->
-					ppNode f key;
-					pp f " : ";
-					ppNode f value;
-					pp f ", ")
+					ppNode indent key;
+					outs " : ";
+					ppNode indent value)
 			map;
-			pp f "}@]"
+			outc '}'
 
-and ppSeq f style list =
+and ppSeq indent style list =
 	let style =
 		match style with
 		| None -> Block
@@ -171,24 +189,22 @@ and ppSeq f style list =
 	in
 	match style with
 		| Block ->
-			pp f "@[<v>";
-			pp_newlines
+			let newIndent = indent + num_sp in
+			ppNewlines indent
 				(fun node ->
-					pp f "@[<hov>- ";
-					ppNode f node;
-					pp f "@]")
-			f list;
-			pp f "@]"
+					outs "- ";
+					ppNode newIndent node)
+			list
 		| Flow ->
-			pp f "@[<hov>[";
-			List.iter
-				(fun node ->
-					ppNode f node;
-					pp f ", ")
+			outc '[';
+			ppCommas
+				(fun node -> ppNode indent node)
 			list;
-			pp f "]@]"
+			outc ']'
 
-let ppDoc f doc =
-	pp f "@[<v>"; (* "@[<h>%%YAML@ 1.2@]@ " for YAML 1.2 compliance *)
-	ppNode f doc.node;
-	pp f "@]@?"
+let ppDoc oc doc =
+	(* "@[<h>%%YAML@ 1.2@]@ " for YAML 1.2 compliance *)
+	Buffer.clear b;
+	ppNode 0 doc.node;
+	Buffer.output_buffer oc b;
+	flush oc
