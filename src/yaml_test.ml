@@ -15,25 +15,45 @@
 open Yaml
 
 let _ =
-	let node1 =
+	let unquoted =
 		mkSeq
-			[mkBool false; mkInt 1;
-			mkMap [ (mkStr "p1", mkStr "p2"); (mkStr "p3", mkStr "p4") ];
-			mkInt 2 ]
+			[ mkStr "this does not need quotes" ]
 	in
-	let node2 = mkStr "toto" in
+
+	let single =
+		mkSeq
+			[mkStr "a{b"; mkStr "x}y"; mkStr "[z"; mkStr "c]";
+			mkStr "t,u"; mkStr "a: b"; mkStr "a #b"; mkStr "-";
+			mkStr "a:b"; mkStr "a#b"; mkStr "a\\b"; mkStr "\"xyz\"";
+			mkStr "here's to \"quotes\""; mkStr "escaping? \\"]
+	in
+
+	(* UTF-8 tests. *)
+	(* First word is "mosquito" in Romanian. *)
+	(* Second word is "Naruto" in Japanese hiragana. *)
+	let utf8_str =
+		"\r\n" ^ utf8 [| 0x0163; 0x103; 0x6E; 0x0163; 0x61; 0x72|] ^
+		" " ^ utf8 [| 0x306A; 0x308B; 0x3068 |]
+	in
+	let double = mkSeq [mkStr utf8_str ] in
+
+	let strings =
+		mkMap
+			[ (mkStr "unquoted", unquoted);
+			(mkStr "single quoted", single);
+			(mkStr "double quoted", double) ]
+	in
 	
-	let node4 = mkStr "tata" in
-	let node5 = mkFloat 3.5 in
-	let node6 = mkInt 56 in
-	let node7 = mkNull () in
-	let node8 =
+	let others =
 		mkSeq
-			[mkBool false; mkInt 1; mkSeq [mkStr "a"; mkStr "b"]; mkInt 2;
-			mkSeq [mkStr "c"; mkStr "d"]]
+			[ mkBool false; mkBool true; mkFloat 3.5; mkInt 45; mkNull () ]
 	in
-	let node3 = mkMap [(node4, node5); (node5, node8); (node6, node7)] in
-	let node = mkSeq [node1; node2; node3] in
+	
+	let node =
+		mkMap
+			[ (mkStr "string literals", strings);
+			(mkStr "other literals", others) ]
+	in
 	let doc = mkDoc node in
 	
 	let oc = open_out "yaml_test.txt" in

@@ -125,6 +125,12 @@ val isScalar : node -> bool
 
 val isSeq : node -> bool
 
+(** {7 Encoding functions} *)
+
+val utf8 : int array -> string
+(** [utf8 chars] takes a Unicode character array, translates each of them to
+UTF-8 bytes, and returns a string that contains the resulting bytes. *)
+
 (** {6 YAML Document} *)
 
 type doc
