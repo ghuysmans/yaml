@@ -48,8 +48,8 @@ type style =
 
 type kind =
 	| Scalar of scalar
-	| Seq of style option * node list
-	| Map of style option * (node * node) list
+	| Seq of node list
+	| Map of (node * node) list
 
 and node = {
 	kind : kind;
@@ -78,17 +78,9 @@ let mkNull () = mkNode (Scalar Null)
 
 let mkStr s = mkNode (Scalar (Str s))
 
-let mkMap ?style map = mkNode (Map (style, map))
+let mkMap map = mkNode (Map map)
 
-let mkMapBlock map = mkMap ~style:Block map
-
-let mkMapFlow map = mkMap ~style:Flow map
-
-let mkSeq ?style list = mkNode (Seq (style, list))
-
-let mkSeqBlock list = mkSeq ~style:Block list
-
-let mkSeqFlow list = mkSeq ~style:Flow list
+let mkSeq list = mkNode (Seq list)
 
 let mkDoc node = {
 	node = node;
@@ -109,6 +101,28 @@ let isSeq node =
 	match node.kind with
 		| Seq _ -> true
 		| _ -> false
+
+let seqStyle list =
+	let isFlow =
+		List.for_all
+			(fun node -> isScalar node)
+		list
+	in
+	if isFlow then
+		Flow
+	else
+		Block
+
+let mapStyle map =
+	let isFlow =
+		List.for_all
+			(fun (key, value) -> isScalar key && isScalar value)
+		map
+	in
+	if isFlow then
+		Flow
+	else
+		Block
 
 (* the buffer will be used by every output. *)
 let b = Buffer.create 16384
@@ -148,15 +162,10 @@ let rec ppCommas fn map =
 let rec ppNode indent node =
 	match node.kind with
 		| Scalar scalar -> ppScalar scalar
-		| Seq (style, list) -> ppSeq indent style list
-		| Map (style, map) -> ppMap indent style map
+		| Seq list -> ppSeq indent (seqStyle list) list
+		| Map map -> ppMap indent (mapStyle map) map
 
 and ppMap indent style map =
-	let style =
-		match style with
-		| None -> Block
-		| Some style -> style
-	in
 	match style with
 		| Block ->
 			let newIndent = indent + num_sp in
@@ -182,11 +191,6 @@ and ppMap indent style map =
 			outc '}'
 
 and ppSeq indent style list =
-	let style =
-		match style with
-		| None -> Block
-		| Some style -> style
-	in
 	match style with
 		| Block ->
 			let newIndent = indent + num_sp in

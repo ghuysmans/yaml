@@ -16,9 +16,9 @@ open Yaml
 
 let _ =
 	let node1 =
-		mkSeqFlow
+		mkSeq
 			[mkBool false; mkInt 1;
-			mkMapFlow [ (mkStr "p1", mkStr "p2"); (mkStr "p3", mkStr "p4") ];
+			mkMap [ (mkStr "p1", mkStr "p2"); (mkStr "p3", mkStr "p4") ];
 			mkInt 2 ]
 	in
 	let node2 = mkStr "toto" in
@@ -28,12 +28,12 @@ let _ =
 	let node6 = mkInt 56 in
 	let node7 = mkNull () in
 	let node8 =
-		mkSeqBlock
-			[mkBool false; mkInt 1; mkSeqBlock [mkStr "a"; mkStr "b"]; mkInt 2;
-			mkSeqFlow [mkStr "c"; mkStr "d"]]
+		mkSeq
+			[mkBool false; mkInt 1; mkSeq [mkStr "a"; mkStr "b"]; mkInt 2;
+			mkSeq [mkStr "c"; mkStr "d"]]
 	in
-	let node3 = mkMapBlock [(node4, node5); (node5, node8); (node6, node7)] in
-	let node = mkSeqBlock [node1; node2; node3] in
+	let node3 = mkMap [(node4, node5); (node5, node8); (node6, node7)] in
+	let node = mkSeq [node1; node2; node3] in
 	let doc = mkDoc node in
 	
 	let oc = open_out "yaml_test.txt" in

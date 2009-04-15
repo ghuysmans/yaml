@@ -12,66 +12,112 @@
 (* Matthieu WIPLIEZ <Matthieu.Wipliez@insa-rennes.fr                         *)
 (*****************************************************************************)
 
-module SH : Hashtbl.S with type key = string
+(** YAML parser and pretty-printer. 
+
+{ul
+{- The parser has not been implemented yet.}
+{- Emitting YAML:
+{[
+let node =
+  Yaml.mkMap
+    [
+      (Yaml.mkStr "american",
+       Yaml.mkSeq
+         [Yaml.mkStr "Boston Red Sox";
+          Yaml.mkStr "Detroit Tigers";
+          Yaml.mkStr "New York Yankees"]);
+
+      (Yaml.mkStr "national",
+       Yaml.mkSeq
+         [Yaml.mkStr "New York Mets";
+          Yaml.mkStr "Chicago Cubs";
+          Yaml.mkStr "Atlanta Braves"])
+    ]
+in
+
+let doc = mkDoc node in
+let oc = open_out "output.txt" in
+ppDoc oc doc;
+close_out oc
+]}
+
+"output.txt" will contain something very similar to:
+{v %YAML 1.2
+---
+american: [Boston Red Sox, Detroit Tigers, New York Yankees]
+national: [New York Mets, Chicago Cubs, Atlanta Braves] v}}}
+
+See {{:http://yaml.org/spec/1.2/} YAML 1.2} for more information on the
+YAML 1.2 specification.
+
+@author Matthieu Wipliez
+*)
+
+(** {6 Tags} *)
 
 type tag = {
-	mutable shorthand : string;
-	mutable full : string;
-	mutable verbatim : bool;
+	mutable shorthand : string; (** The tag shorthand. *)
+	mutable full : string; (** The tag full name. *)
+	mutable verbatim : bool; (** Whether the tag is verbatim. *)
 }
+(** A YAML tag. Not implemented yet. *)
+
+(** {6 Nodes} *)
 
 type scalar =
-	| Binary of string
-	| Bool of bool
-	| Float of float
-	| Int of int
-	| Null
-	| Str of string
-
-type style =
-	| Block
-	| Flow
+	| Binary of string (** A YAML binary string. Will be encoded in base64. *)
+	| Bool of bool (** A YAML boolean. *)
+	| Float of float (** A YAML floating point number. *)
+	| Int of int (** A YAML integer. *)
+	| Null (** A YAML null value. *)
+	| Str of string (** A YAML string. *)
+(** A YAML scalar. *) 
 
 type kind =
-	| Scalar of scalar
-	| Seq of style option * node list
-	| Map of style option * (node * node) list
+	| Scalar of scalar (** A {Yaml.scalar} node. *)
+	| Seq of node list (** A YAML sequence of {!Yaml.node}s. *)
+	| Map of (node * node) list (** A YAML map of {!Yaml.node}s as an association list. *)
+(** Different kinds of YAML nodes. *)
 
 and node = {
 	kind : kind;
 	mutable tag : tag option;
 }
+(** A YAML node. Has a {!Yaml.kind} and a possibly empty {!Yaml.tag}. *)
 
-type doc = {
-	node : node;
-	tags : tag SH.t;
-}
+(** {7 Node functions} *)
 
 val mkBinary : string -> node
+(** [mkBinary string] returns an untagged {!Yaml.node} whose kind is
+[Scalar (Binary str)]. *) 
 
 val mkBool : bool -> node
+(** [mkBool bool] returns an untagged {!Yaml.node} whose kind is
+[Scalar (Bool bool)]. *)
 
 val mkFloat : float -> node
+(** [mkFloat float] returns an untagged {!Yaml.node} whose kind is
+[Scalar (Float float)]. *)
 
 val mkInt : int -> node
+(** [mkInt int] returns an untagged {!Yaml.node} whose kind is
+[Scalar (Int int)]. *)
 
 val mkNull : unit -> node
+(** [mkNull ()] returns an untagged {!Yaml.node} whose kind is
+[Scalar Null]. *)
 
 val mkStr : string -> node
+(** [mkStr str] returns an untagged {!Yaml.node} whose kind is
+[Scalar (Str str)]. *)
 
-val mkMap : ?style:style -> (node * node) list -> node
+val mkMap : (node * node) list -> node
+(** [mkMap map] returns an untagged {!Yaml.node} whose kind is
+[Map map]. *)
 
-val mkMapBlock : (node * node) list -> node
-
-val mkMapFlow : (node * node) list -> node
-
-val mkSeq : ?style:style -> node list -> node
-
-val mkSeqBlock : node list -> node
-
-val mkSeqFlow : node list -> node
-
-val mkDoc : node -> doc
+val mkSeq : node list -> node
+(** [mkSeq list] returns an untagged {!Yaml.node} whose kind is
+[Seq list]. *)
 
 val isMap : node -> bool
 
@@ -79,4 +125,33 @@ val isScalar : node -> bool
 
 val isSeq : node -> bool
 
+(** {6 YAML Document} *)
+
+type doc
+(** The type of a document. The current implementation allows a document to contain only
+a single stream. A stream contains a single top-level node. A document is pretty-printed
+to YAML by calling {!Yaml.ppDoc}. *)
+
+val mkDoc : node -> doc
+(** [mkDoc node] creates a new [Yaml.doc] that contains a single top-level node. *)
+
 val ppDoc : out_channel -> doc -> unit
+(** [ppDoc out doc] pretty-prints the given [Yaml.doc] document as YAML. 
+
+A few notes:
+{ul
+  {- the pretty-printer follows the established principle in other YAML implementations
+concerning which sequences and maps have flow or block styles. Namely, a sequence/map
+has flow style if it contains only scalars; it has block style otherwise.}
+  {- boolean are printed as [true] and [false].}
+  {- floats and integers are printed without quotes.}
+  {- strings are printed as follows:
+    {ul
+      {- without any quotes if it does not contain any characters that need to be espaced, or}
+      {- with single quotes if it contains ['"'] or [\ ], or}
+      {- with double quotes}
+    }
+  }
+}
+
+*)
