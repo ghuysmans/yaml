@@ -55,10 +55,29 @@ let _ =
 			[ mkBool false; mkBool true; mkFloat 3.5; mkInt 45; mkNull () ]
 	in
 	
+	
+  let map =
+		Yaml.mkMap
+    [
+      (Yaml.mkStr "american",
+       Yaml.mkSeq
+         [Yaml.mkStr "Boston Red Sox";
+          Yaml.mkStr "Detroit Tigers";
+          Yaml.mkStr "New York Yankees"]);
+
+      (Yaml.mkStr "national",
+       Yaml.mkSeq
+         [Yaml.mkStr "New York Mets";
+          Yaml.mkStr "Chicago Cubs";
+          Yaml.mkStr "Atlanta Braves"])
+    ]
+	in
+	
 	let node =
 		mkMap
 			[ (mkStr "string literals", strings);
-			(mkStr "other literals", others) ]
+			(mkStr "other literals", others);
+			(mkStr "a map", map) ]
 	in
 	let doc = mkDoc node in
 	

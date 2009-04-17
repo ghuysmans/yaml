@@ -70,7 +70,7 @@ type scalar =
 	| Float of float (** A YAML floating point number. *)
 	| Int of int (** A YAML integer. *)
 	| Null (** A YAML null value. *)
-	| Str of string (** A YAML string. *)
+	| Str of string (** A YAML UTF-8 encoded string. *)
 (** A YAML scalar. *) 
 
 type kind =
@@ -154,7 +154,7 @@ has flow style if it contains only scalars; it has block style otherwise.}
   {- strings are printed as follows:
     {ul
       {- without any quotes if it does not contain any characters that need to be espaced, or}
-      {- with single quotes if it contains ['"'] or [\ ], or}
+      {- with single quotes if it does not contain non-printable characters, or}
       {- with double quotes}
     }
   }
