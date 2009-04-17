@@ -234,12 +234,62 @@ let num_sp = 2
 
 let ppSingleQuotes str =
 	outc '\'';
-	outs str;
+	String.iter
+		(fun char ->
+			match char with
+				| '\'' ->
+					outc '\'';
+					outc '\''
+				| _ ->
+					outc char)
+	str;
 	outc '\''
 
 let ppDoubleQuotes str =
+	let i = ref 0 in
+	let length = String.length str in
+	
+	(* read_char is used by uchar_utf8 to read UTF-8 bytes from [str] and *)
+	(* return a Unicode char (as an int). *)
+	let read_char () =
+		if !i = length then
+			raise Malformed
+		else
+			let char = String.unsafe_get str !i in
+			incr i;
+			int_of_char char
+	in
+	
+	(* for each Unicode char in str, check whether it is necessary to escape *)
 	outc '"';
-	outs str;
+	while !i < length do
+		let uchar = uchar_utf8 read_char in
+		match uchar with
+			| 0 -> outs "\\0"
+			| 0x07 -> outs "\\a" (* bell *)
+			| 0x08 -> outs "\\b" (* backspace *)
+			| 0x09 -> outs "\\t" (* tab *)
+			| 0x0A -> outs "\\n" (* line feed *)
+			| 0x0B -> outs "\\v" (* vertical tab *)
+			| 0x0D -> outs "\\r" (* carriage return *)
+			| 0x1B -> outs "\\e" (* espace *)
+			| 0x22 -> outs "\\\"" (* double quote *)
+			| 0x5C -> outs "\\\\" (* back slash *)
+			| 0x85 -> outs "\\N" (* next line *)
+			| 0xA0 -> outs "\\_" (* Unicode non-breaking space *)
+			| 0x2028 -> outs "\\L" (* Unicode line separator *)
+			| 0x2029 -> outs "\\P" (* Unicode paragraph separator *)
+
+			| _ when uchar < 0x20 -> outs (sprintf "\\x%x" uchar)
+
+			| 0xFFFE | 0xFFFF
+			| _ when uchar >= 0xD800 && uchar <= 0xDFFF ->
+				outs (sprintf "\\u%x" uchar)
+
+			(* all other chars are printable *)
+			| _ -> outs (utf8 [| uchar |])
+
+	done;
 	outc '"'
 
 let ppNoQuotes str = outs str
@@ -254,15 +304,23 @@ let mustUseSingle =
 	function uchar ->
 		let res =
 			(* Plain scalars must never contain the ": " and " #" character combinations *)
-			!lastChar = 0x3A (* ':' *) && uchar = 0x20 ||
 			!lastChar = 0x20 && uchar = 0x23 (* '#' *) ||
+			
+			match uchar with
+			(* Note: It appears that some YAML implementations don't cope particularly *)
+			(* well with ':' or '?' characters even when they are not surrounded by *)
+			(* spaces, so we forbid them in plain scalars too. *)
+			| 0x3A (* ':' *) | 0x3F (* '?' *)
+
 			(* In addition, inside flow collections, plain scalars must not contain *)
 			(* the '[', ']', '{', '}' and ',' characters. *)
-			(* Note: we further restrict plain scalars by applying this regardless of *)
+			(* Note: We further restrict plain scalars by applying this regardless of *)
 			(* whether the scalar is in a flow collection. *)
-			uchar = 0x2C (* ',' *) ||
-			uchar = 0x5B || uchar = 0x5D || (* '[', ']' *)
-			uchar = 0x7B || uchar = 0x7D (* '{', '}' *)
+			| 0x2C (* ',' *)
+			| 0x5B (* '[' *) | 0x5D (* ']' *)
+			| 0x7B (* '{' *) | 0x7D (* '}' *) -> true
+
+			| _ -> false
 		in
 		lastChar := uchar;
 		res
@@ -304,52 +362,61 @@ let ppString str =
 			int_of_char char
 	in
 
-	try
+	if length = 0 then (
+		(* a plain scalar must not be empty *)
+		ppSingleQuotes str
+	) else (
 		(* a plain scalar must not contain leading or trailing white space characters. *)
-		
-		
-		(* for each Unicode char in str, check whether it would be necessary to *)
-		(* use single quote style or double quote style. *)
-		(* Note that we do not use String.iter because we deal with UTF-8 here. *)
-		while !i < length do
-			let uchar = uchar_utf8 read_char in
-			if mustUseSingle uchar then (
-				ppSingleQuotes str;
-				raise Done
-			);
-
-			if mustUseDouble uchar then (
-				ppDoubleQuotes str;
-				raise Done
-			)
-		done;
-		
-		if length = 0 then (
-			(* a plain scalar must not be empty *)
+		let c0 = int_of_char (String.unsafe_get str 0) in
+		let cl = int_of_char (String.unsafe_get str (length - 1)) in
+		if c0 = 0x09 || c0 = 0x20 || cl = 0x09 || cl = 0x20 ||
+			(* Additional restriction: a plain scalar must not begin with *)
+			(* '"' = 0x22 or '\'' = 0x27 *)
+			c0 = 0x22 || c0 = 0x27 then
 			ppSingleQuotes str
-		) else if length = 1 then (
-			i := 0;
-			let s0 = uchar_utf8 read_char in
-			match s0 with
-				| 0x2D | 0x3A | 0x3F -> ppSingleQuotes str
-				| _ -> ppNoQuotes str
-		) else (
-			(* check whether the two first chars allow the use of plain style *)
-
-			(* the ':', '?' and '-' indicators may be used as the first character *)
-			(* if followed by a non-space character, as this causes no ambiguity. *)
-			i := 0;
-			let s0 = uchar_utf8 read_char in
-			let s1 = uchar_utf8 read_char in
-			match (s0, s1) with
-				| (0x2D, 0x09) | (0x2D, 0x20) (* '-' = 0x2D *)
-				| (0x3A, 0x09) | (0x3A, 0x20) (* ':' = 0x3A *)
-				| (0x3F, 0x09) | (0x3F, 0x20) (* '?' = 0x3F *) -> ppSingleQuotes str
-				| _ ->
-					(* nothing prevents us from writing a plain style scalar *)
-					ppNoQuotes str
-		)
-	with Done -> ()
+		else
+			try
+				(* for each Unicode char in str, check whether it would be necessary to *)
+				(* use single quote style or double quote style. *)
+				(* Note that we do not use String.iter because we deal with UTF-8 here. *)
+				while !i < length do
+					let uchar = uchar_utf8 read_char in
+					if mustUseSingle uchar then (
+						ppSingleQuotes str;
+						raise Done
+					);
+		
+					if mustUseDouble uchar then (
+						ppDoubleQuotes str;
+						raise Done
+					)
+				done;
+	
+				if length = 1 then (
+					i := 0;
+					let s0 = uchar_utf8 read_char in
+					match s0 with
+						(* '-', ':', '?' *)
+						| 0x2D | 0x3A | 0x3F -> ppSingleQuotes str
+						| _ -> ppNoQuotes str
+				) else (
+					(* check whether the two first chars allow the use of plain style *)
+		
+					(* the ':', '?' and '-' indicators may be used as the first character *)
+					(* if followed by a non-space character, as this causes no ambiguity. *)
+					i := 0;
+					let s0 = uchar_utf8 read_char in
+					let s1 = uchar_utf8 read_char in
+					match (s0, s1) with
+						| (0x2D, 0x09) | (0x2D, 0x20) (* '-' = 0x2D *)
+						| (0x3A, 0x09) | (0x3A, 0x20) (* ':' = 0x3A *)
+						| (0x3F, 0x09) | (0x3F, 0x20) (* '?' = 0x3F *) -> ppSingleQuotes str
+						| _ ->
+							(* nothing prevents us from writing a plain style scalar *)
+							ppNoQuotes str
+				)
+			with Done -> ()
+	)
 
 let ppScalar = function
 	| Binary bin -> outc '"'; outs bin; outc '"'

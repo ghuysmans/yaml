@@ -17,22 +17,28 @@ open Yaml
 let _ =
 	let unquoted =
 		mkSeq
-			[ mkStr "this does not need quotes" ]
+			[ mkStr "a b"; mkStr "a#b"; mkStr "a\\b"; mkStr "here's to \"quotes\"" ]
 	in
 
 	let single =
 		mkSeq
-			[mkStr "a{b"; mkStr "x}y"; mkStr "[z"; mkStr "c]";
-			mkStr "t,u"; mkStr "a: b"; mkStr "a #b"; mkStr "-";
-			mkStr "a:b"; mkStr "a#b"; mkStr "a\\b"; mkStr "\"xyz\"";
-			mkStr "here's to \"quotes\""; mkStr "escaping? \\"]
+			[mkSeq
+				[mkStr "a:b"; mkStr "a{b"; mkStr "x}y";
+				mkStr "[z"; mkStr "c]"; mkStr "t,u"; mkStr "a: b";
+				mkStr "a #b"; mkStr "-"];
+			mkSeq
+				[mkStr "http://example.com/foo#bar";
+				mkStr "\"xyz\""; mkStr "???"; mkStr " spaces1"; mkStr "spaces2 "];
+			mkSeq
+				[mkStr "\"here's to 'quotes'\""; mkStr ("NEL char:" ^ utf8 [| 0x85 |]) ]
+			]
 	in
 
 	(* UTF-8 tests. *)
 	(* First word is "mosquito" in Romanian. *)
 	(* Second word is "Naruto" in Japanese hiragana. *)
 	let utf8_str =
-		"\r\n" ^ utf8 [| 0x0163; 0x103; 0x6E; 0x0163; 0x61; 0x72|] ^
+		"\r\n" ^ utf8 [| 0x2028; 0x2029; 0x0163; 0x103; 0x6E; 0x0163; 0x61; 0x72|] ^
 		" " ^ utf8 [| 0x306A; 0x308B; 0x3068 |]
 	in
 	let double = mkSeq [mkStr utf8_str ] in
