@@ -92,7 +92,7 @@ reference other nodes by their anchor. *)
 }
 (** A YAML node. Has a {!Yaml.kind} and a possibly empty {!Yaml.tag}. *)
 
-(** {7 Node functions}
+(** {7 Node creation functions}
 
 The following functions allow the creation of different YAML nodes. Each of
 them take a first [?anchor:anchor] parameter, that is a optional anchor.
@@ -141,13 +141,25 @@ val mkSeq : ?anchor:anchor -> node list -> node
 (** [mkSeq ?anchor list] returns an untagged {!Yaml.node} whose kind is
 [Seq list]. *)
 
+(** {7 Node test functions} *)
+
+val isCollection : node -> bool
+(** [isCollection node] returns [true] if [node] is a [Yaml.Map] or
+[Yaml.Seq], and [false] otherwise. *)
+
 val isMap : node -> bool
+(** [isMap node] returns [true] if [node] is a [Yaml.Map], and [false]
+otherwise. *)
 
 val isScalar : node -> bool
+(** [isScalar node] returns [true] if [node] is a [Yaml.Scalar], and [false]
+otherwise. *)
 
 val isSeq : node -> bool
+(** [isSeq node] returns [true] if [node] is a [Yaml.Seq], and [false]
+otherwise. *)
 
-(** {7 Encoding functions} *)
+(** {6 Encoding functions} *)
 
 val utf8 : int array -> string
 (** [utf8 chars] takes a Unicode character array, translates each of them to

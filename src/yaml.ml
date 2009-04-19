@@ -195,6 +195,11 @@ let mkDoc node = {
 	tags = SH.create 30;
 }
 
+let isCollection node =
+	match node.kind with
+		| Map _ | Seq _ -> true
+		| _ -> false
+
 let isMap node =
 	match node.kind with
 		| Map _ -> true
@@ -211,26 +216,26 @@ let isSeq node =
 		| _ -> false
 
 let seqStyle list =
-	let isFlow =
-		List.for_all
-			(fun node -> isScalar node)
+	let isBlock =
+		List.exists
+			(fun node -> isCollection node)
 		list
 	in
-	if isFlow then
-		Flow
-	else
+	if isBlock then
 		Block
+	else
+		Flow
 
 let mapStyle map =
-	let isFlow =
-		List.for_all
-			(fun (key, value) -> isScalar key && isScalar value)
+	let isBlock =
+		List.exists
+			(fun (key, value) -> isCollection key || isCollection value)
 		map
 	in
-	if isFlow then
-		Flow
-	else
+	if isBlock then
 		Block
+	else
+		Flow
 
 (*****************************************************************************)
 (* the buffer will be used by every output. *)
