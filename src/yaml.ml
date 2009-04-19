@@ -200,6 +200,12 @@ let isCollection node =
 		| Map _ | Seq _ -> true
 		| _ -> false
 
+let isNonEmptyCollection node =
+	match node.kind with
+		| Map list -> list <> []
+		| Seq list -> list <> []
+		| _ -> false
+
 let isMap node =
 	match node.kind with
 		| Map _ -> true
@@ -218,7 +224,7 @@ let isSeq node =
 let seqStyle list =
 	let isBlock =
 		List.exists
-			(fun node -> isCollection node)
+			(fun node -> isNonEmptyCollection node)
 		list
 	in
 	if isBlock then
@@ -229,7 +235,7 @@ let seqStyle list =
 let mapStyle map =
 	let isBlock =
 		List.exists
-			(fun (key, value) -> isCollection key || isCollection value)
+			(fun (key, value) -> isNonEmptyCollection key || isNonEmptyCollection value)
 		map
 	in
 	if isBlock then
