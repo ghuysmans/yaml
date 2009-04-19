@@ -15,9 +15,11 @@
 open Yaml
 
 let _ =
+	let src = mkStr ~anchor:"a1" "node with an anchor" in
 	let unquoted =
 		mkSeq
-			[ mkStr "a b"; mkStr "a#b"; mkStr "a\\b"; mkStr "here's to \"quotes\"" ]
+			[ mkStr "a b"; mkStr "a#b"; mkStr "a\\b"; mkStr "here's to \"quotes\"";
+			src ]
 	in
 
 	let single =
@@ -47,7 +49,8 @@ let _ =
 		mkMap
 			[ (mkStr "unquoted", unquoted);
 			(mkStr "single quoted", single);
-			(mkStr "double quoted", double) ]
+			(mkStr "double quoted", double);
+			(mkStr "aliases", mkAlias src) ]
 	in
 	
 	let others =
@@ -82,5 +85,5 @@ let _ =
 	let doc = mkDoc node in
 	
 	let oc = open_out "yaml_test.txt" in
-	ppDoc oc doc;
+	dump oc doc;
 	close_out oc

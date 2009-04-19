@@ -135,12 +135,13 @@ type tag = {
 	mutable verbatim : bool;
 }
 
+type anchor = string
+
 type scalar =
 	| Binary of string
 	| Bool of bool
 	| Float of float
 	| Int of int
-	| Null
 	| Str of string
 
 type style =
@@ -148,12 +149,15 @@ type style =
 	| Flow
 
 type kind =
+	| Alias of node
+	| Map of (node * node) list
+	| Null
 	| Scalar of scalar
 	| Seq of node list
-	| Map of (node * node) list
 
 and node = {
-	kind : kind;
+	anchor : anchor option;
+	mutable kind : kind;
 	mutable tag : tag option;
 }
 
@@ -162,26 +166,29 @@ type doc = {
 	tags : tag SH.t;
 }
 
-let mkNode kind = {
-	kind = kind;
-	tag = None;
-}
+let mkNode ?anchor kind =	{
+		anchor = anchor;
+		kind = kind;
+		tag = None;
+	}
 
-let mkBinary b = mkNode (Scalar (Binary b))
+let mkAlias ?anchor anchorSrc = mkNode ?anchor (Alias anchorSrc)
 
-let mkBool b = mkNode (Scalar (Bool b))
+let mkBinary ?anchor b = mkNode ?anchor (Scalar (Binary b))
 
-let mkFloat f = mkNode (Scalar (Float f))
+let mkBool ?anchor b = mkNode ?anchor (Scalar (Bool b))
 
-let mkInt i = mkNode (Scalar (Int i))
+let mkFloat ?anchor f = mkNode ?anchor (Scalar (Float f))
 
-let mkNull () = mkNode (Scalar Null)
+let mkInt ?anchor i = mkNode ?anchor (Scalar (Int i))
 
-let mkStr s = mkNode (Scalar (Str s))
+let mkStr ?anchor s = mkNode ?anchor (Scalar (Str s))
 
-let mkMap map = mkNode (Map map)
+let mkMap ?anchor map = mkNode ?anchor (Map map)
 
-let mkSeq list = mkNode (Seq list)
+let mkNull ?anchor () = mkNode ?anchor Null
+
+let mkSeq ?anchor list = mkNode ?anchor (Seq list)
 
 let mkDoc node = {
 	node = node;
@@ -423,7 +430,6 @@ let ppScalar = function
 	| Bool bool -> outs (string_of_bool bool)
 	| Float f -> outs (string_of_float f)
 	| Int i -> outs (string_of_int i)
-	| Null -> outs "null"
 	| Str s -> ppString s
 
 let ppIndent indent = for i = 1 to indent do outc ' ' done
@@ -447,11 +453,50 @@ let rec ppCommas fn map =
 			outs ", ";
 			ppCommas fn rest
 
+(** [checkAnchor anchor] checks that the anchor name is valid according to
+YAML 1.2 spec *)
+let checkAnchor anchor =
+	if anchor = "" then
+		invalid_arg "An anchor name may not be empty";
+
+	(* TODO: also check for non-printable characters *)
+
+	(* Anchor names must not contain the '[', ']', '{', '}' and ',' characters. *)
+	String.iter
+		(fun char ->
+			match int_of_char char with
+			| 0x09 | 0x0A | 0x0D | 0x20 ->
+				invalid_arg "Anchor names must not contain white space or line break characters." 
+
+			| 0x2C (* ',' *)
+			| 0x5B (* '[' *) | 0x5D (* ']' *)
+			| 0x7B (* '{' *) | 0x7D (* '}' *) ->
+				invalid_arg "Anchor names must not contain the '[', ']', '{', '}' and ',' characters."
+			| _ -> ())
+	anchor
+
+let ppAlias node =
+	match node.anchor with
+		| None -> assert false (* checked by mkAlias *)
+		| Some anchor ->
+			checkAnchor anchor;
+			outs "*"; outs anchor
+
 let rec ppNode indent node =
+	(match node.anchor with
+		| None -> ()
+		| Some anchor ->
+			checkAnchor anchor;
+			outc '&';
+			outs anchor;
+			outc ' ');
+	
 	match node.kind with
+		| Alias node -> ppAlias node 
+		| Map map -> ppMap indent (mapStyle map) map
+		| Null -> outs "null"
 		| Scalar scalar -> ppScalar scalar
 		| Seq list -> ppSeq indent (seqStyle list) list
-		| Map map -> ppMap indent (mapStyle map) map
 
 and ppMap indent style map =
 	match style with
@@ -494,7 +539,7 @@ and ppSeq indent style list =
 			list;
 			outc ']'
 
-let ppDoc oc doc =
+let dump oc doc =
 	Buffer.clear b;
 	outs "\xEF\xBB\xBF"; (* UTF-8 BOM *)
 	outs "%YAML 1.2\n---\n"; (* YAML 1.2 declaration *)

@@ -37,7 +37,7 @@ in
 
 let doc = mkDoc node in
 let oc = open_out "output.txt" in
-ppDoc oc doc;
+dump oc doc;
 close_out oc
 ]}
 
@@ -53,7 +53,7 @@ YAML 1.2 specification.
 @author Matthieu Wipliez
 *)
 
-(** {6 Tags} *)
+(** {6 Node properties} *)
 
 type tag = {
 	mutable shorthand : string; (** The tag shorthand. *)
@@ -62,6 +62,9 @@ type tag = {
 }
 (** A YAML tag. Not implemented yet. *)
 
+type anchor = string
+(** A YAML anchor. *)
+
 (** {6 Nodes} *)
 
 type scalar =
@@ -69,54 +72,73 @@ type scalar =
 	| Bool of bool (** A YAML boolean. *)
 	| Float of float (** A YAML floating point number. *)
 	| Int of int (** A YAML integer. *)
-	| Null (** A YAML null value. *)
 	| Str of string (** A YAML UTF-8 encoded string. *)
 (** A YAML scalar. *) 
 
 type kind =
-	| Scalar of scalar (** A {Yaml.scalar} node. *)
-	| Seq of node list (** A YAML sequence of {!Yaml.node}s. *)
+	| Alias of node (** A YAML alias node. *)
 	| Map of (node * node) list (** A YAML map of {!Yaml.node}s as an association list. *)
+	| Null (** A YAML empty node. *)
+	| Scalar of scalar (** A {!Yaml.scalar} node. *)
+	| Seq of node list (** A YAML sequence of {!Yaml.node}s. *)
 (** Different kinds of YAML nodes. *)
 
 and node = {
-	kind : kind;
-	mutable tag : tag option;
+	anchor : anchor option;
+(** the node's optional anchor. This field is persistent because nodes may
+reference other nodes by their anchor. *)
+	mutable kind : kind; (** the node kind. *)
+	mutable tag : tag option; (** the node's optional tag. *)
 }
 (** A YAML node. Has a {!Yaml.kind} and a possibly empty {!Yaml.tag}. *)
 
-(** {7 Node functions} *)
+(** {7 Node functions}
 
-val mkBinary : string -> node
-(** [mkBinary string] returns an untagged {!Yaml.node} whose kind is
+The following functions allow the creation of different YAML nodes. Each of
+them take a first [?anchor:anchor] parameter, that is a optional anchor.
+Once a node is created, it is not possible to modify its anchor.
+This ensures that alias nodes referencing it do not become invalid.
+The anchor name is still mutable though as it is just a string.
+As a consequence, the validity of an anchor name is only checked when
+{!Yaml.dump}ing a document.
+An empty anchor, or an anchor with ['\['], ['\]'], ['\{'], ['\}'] or [',']
+characters will result in an [Invalid_argument] exception being raised.
+*)
+
+val mkAlias : ?anchor:anchor -> node -> node
+(** [mkAlias ?anchor node] returns an untagged {!Yaml.node} whose kind is
+[Alias node]. *)
+
+val mkBinary : ?anchor:anchor -> string -> node
+(** [mkBinary ?anchor string] returns an untagged {!Yaml.node} whose kind is
 [Scalar (Binary str)]. *) 
 
-val mkBool : bool -> node
-(** [mkBool bool] returns an untagged {!Yaml.node} whose kind is
+val mkBool : ?anchor:anchor -> bool -> node
+(** [mkBool ?anchor bool] returns an untagged {!Yaml.node} whose kind is
 [Scalar (Bool bool)]. *)
 
-val mkFloat : float -> node
-(** [mkFloat float] returns an untagged {!Yaml.node} whose kind is
+val mkFloat : ?anchor:anchor -> float -> node
+(** [mkFloat ?anchor float] returns an untagged {!Yaml.node} whose kind is
 [Scalar (Float float)]. *)
 
-val mkInt : int -> node
-(** [mkInt int] returns an untagged {!Yaml.node} whose kind is
+val mkInt : ?anchor:anchor -> int -> node
+(** [mkInt ?anchor int] returns an untagged {!Yaml.node} whose kind is
 [Scalar (Int int)]. *)
 
-val mkNull : unit -> node
-(** [mkNull ()] returns an untagged {!Yaml.node} whose kind is
-[Scalar Null]. *)
-
-val mkStr : string -> node
-(** [mkStr str] returns an untagged {!Yaml.node} whose kind is
+val mkStr : ?anchor:anchor -> string -> node
+(** [mkStr ?anchor str] returns an untagged {!Yaml.node} whose kind is
 [Scalar (Str str)]. *)
 
-val mkMap : (node * node) list -> node
-(** [mkMap map] returns an untagged {!Yaml.node} whose kind is
+val mkMap : ?anchor:anchor -> (node * node) list -> node
+(** [mkMap ?anchor map] returns an untagged {!Yaml.node} whose kind is
 [Map map]. *)
 
-val mkSeq : node list -> node
-(** [mkSeq list] returns an untagged {!Yaml.node} whose kind is
+val mkNull : ?anchor:anchor -> unit -> node
+(** [mkNull ?anchor ()] returns an untagged {!Yaml.node} whose kind is
+[Null]. *)
+
+val mkSeq : ?anchor:anchor -> node list -> node
+(** [mkSeq ?anchor list] returns an untagged {!Yaml.node} whose kind is
 [Seq list]. *)
 
 val isMap : node -> bool
@@ -136,13 +158,13 @@ UTF-8 bytes, and returns a string that contains the resulting bytes. *)
 type doc
 (** The type of a document. The current implementation allows a document to contain only
 a single stream. A stream contains a single top-level node. A document is pretty-printed
-to YAML by calling {!Yaml.ppDoc}. *)
+to YAML by calling {!Yaml.dump}. *)
 
 val mkDoc : node -> doc
-(** [mkDoc node] creates a new [Yaml.doc] that contains a single top-level node. *)
+(** [mkDoc node] creates a new {!Yaml.doc} that contains a single top-level node. *)
 
-val ppDoc : out_channel -> doc -> unit
-(** [ppDoc out doc] pretty-prints the given [Yaml.doc] document as YAML. 
+val dump : out_channel -> doc -> unit
+(** [dump out doc] pretty-prints the given {!Yaml.doc} document as YAML.
 
 A few notes:
 {ul
