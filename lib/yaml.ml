@@ -443,7 +443,7 @@ let ppScalar = function
 	| Int i -> outs (string_of_int i)
 	| Str s -> ppString s
 
-let ppIndent indent = for i = 1 to indent do outc ' ' done
+let ppIndent indent = for _ = 1 to indent do outc ' ' done
 
 let rec ppNewlines indent fn list =
 	match list with
