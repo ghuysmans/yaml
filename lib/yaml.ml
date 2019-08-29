@@ -557,3 +557,96 @@ let dump oc doc =
 	ppNode 0 doc.node;
 	Buffer.output_buffer oc b;
 	flush oc
+
+let%expect_test _ =
+	let src = mkStr ~anchor:"a1" "node with an anchor" in
+	let unquoted =
+		mkSeq
+			[ mkStr "a b"; mkStr "a#b"; mkStr "a\\b"; mkStr "here's to \"quotes\"";
+			src ]
+	in
+
+	let single =
+		mkSeq
+			[mkSeq
+				[mkStr "a:b"; mkStr "a{b"; mkStr "x}y";
+				mkStr "[z"; mkStr "c]"; mkStr "t,u"; mkStr "a: b";
+				mkStr "a #b"; mkStr "-"];
+			mkSeq
+				[mkStr "http://example.com/foo#bar";
+				mkStr "\"xyz\""; mkStr "???"; mkStr " spaces1"; mkStr "spaces2 "];
+			mkSeq
+				[mkStr "\"here's to 'quotes'\""; mkStr ("NEL char:" ^ utf8 [| 0x85 |]) ]
+			]
+	in
+
+	(* UTF-8 tests. *)
+	(* First word is "mosquito" in Romanian. *)
+	(* Second word is "Naruto" in Japanese hiragana. *)
+	let utf8_str =
+		"\r\n" ^ utf8 [| 0x2028; 0x2029; 0x0163; 0x103; 0x6E; 0x0163; 0x61; 0x72|] ^
+		" " ^ utf8 [| 0x306A; 0x308B; 0x3068 |]
+	in
+	let double = mkSeq [mkStr utf8_str ] in
+
+	let strings =
+		mkMap
+			[ (mkStr "unquoted", unquoted);
+			(mkStr "single quoted", single);
+			(mkStr "double quoted", double);
+			(mkStr "aliases", mkAlias src) ]
+	in
+	
+	let others =
+		mkSeq
+			[ mkBool false; mkBool true; mkFloat 3.5; mkInt 45; mkNull () ]
+	in
+	
+	
+  let map =
+		mkMap
+    [
+      (mkStr "american",
+       mkSeq
+         [mkStr "Boston Red Sox";
+          mkStr "Detroit Tigers";
+          mkStr "New York Yankees"]);
+
+      (mkStr "national",
+       mkSeq
+         [mkStr "New York Mets";
+          mkStr "Chicago Cubs";
+          mkStr "Atlanta Braves"])
+    ]
+	in
+	
+	let node =
+		mkMap
+			[ (mkStr "string literals", strings);
+			(mkStr "other literals", others);
+			(mkStr "a map", map) ]
+	in
+	let doc = mkDoc node in
+	dump stdout doc;
+	[%expect {|
+  ﻿%YAML 1.2
+  ---
+  string literals :
+    unquoted :
+      [a b, a#b, a\b, here's to "quotes", &a1 node with an anchor]
+    single quoted :
+      - ['a:b', 'a{b', 'x}y', '[z', 'c]', 't,u', 'a: b', 'a #b', '-']
+      - ['http://example.com/foo#bar', '"xyz"', '???', ' spaces1', 'spaces2 ']
+      - ['"here''s to ''quotes''"', 'NEL char:']
+    double quoted :
+      ["\r\n\L\Pţănţar なると"]
+    aliases :
+      *a1
+  other literals :
+    [false, true, 3.5, 45, null]
+  a map :
+    american :
+      [Boston Red Sox, Detroit Tigers, New York Yankees]
+    national :
+      [New York Mets, Chicago Cubs, Atlanta Braves]
+	|}]

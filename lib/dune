@@ -1,0 +1,4 @@
+(library
+ (public_name yaml)
+ (inline_tests)
+ (preprocess (pps ppx_expect)))
